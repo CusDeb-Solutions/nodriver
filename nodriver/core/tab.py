@@ -278,25 +278,32 @@ class Tab(Connection):
         return items
 
     async def select_all(
-        self,
-        selector: str,
-        timeout: Union[int, float] = 10,
+        self, selector: str, timeout: Union[int, float] = 10, include_frames=False
     ) -> List[nodriver.Element]:
         """
         find multiple elements by css selector.
         can also be used to wait for such element to appear.
 
+
         :param selector: css selector, eg a[href], button[class*=close], a > img[src]
         :type selector: str
         :param timeout: raise timeout exception when after this many seconds nothing is found.
         :type timeout: float,int
+        :param include_frames: whether to include results in iframes.
+        :type include_frames: bool
         """
 
         loop = asyncio.get_running_loop()
         now = loop.time()
         selector = selector.strip()
+        items = []
+        if include_frames:
+            frames = await self.query_selector_all("iframe")
+            # unfortunately, asyncio.gather here is not an option
+            for fr in frames:
+                items.extend(await fr.query_selector_all(selector))
 
-        items = await self.query_selector_all(selector)
+        items.extend(await self.query_selector_all(selector))
         while not items:
             await self
             items = await self.query_selector_all(selector)
@@ -555,8 +562,8 @@ class Tab(Connection):
         :rtype:
         """
         doc = await self.send(cdp.dom.get_document(-1, True))
-        search_id, nresult = await self.send(cdp.dom.perform_search(text, True))
         text = text.strip()
+        search_id, nresult = await self.send(cdp.dom.perform_search(text, True))
 
         node_ids = await self.send(cdp.dom.get_search_results(search_id, 0, nresult))
         await self.send(cdp.dom.discard_search_results(search_id))
