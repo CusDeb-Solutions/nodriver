@@ -1,18 +1,19 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import pathlib
 import typing
 import warnings
-from typing import List, Union, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import nodriver.core.browser
-from . import element
-from . import util
+
+from .. import cdp
+from . import element, util
 from .config import PathLike
 from .connection import Connection, ProtocolException
-from .. import cdp
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ class Tab(Connection):
         browser: Optional["nodriver.Browser"] = None,
         **kwargs,
     ):
-        super().__init__(websocket_url, target, **kwargs)
+        super().__init__(websocket_url, target, browser, **kwargs)
         self.browser = browser
         self._dom = None
         self._window_id = None
@@ -208,9 +209,7 @@ class Tab(Connection):
                 text, best_match, return_enclosing_element
             )
             if loop.time() - start_time > timeout:
-                raise asyncio.TimeoutError(
-                    "time ran out while waiting for text: %s" % text
-                )
+                return item
             await self.sleep(0.5)
         return item
 
@@ -240,9 +239,7 @@ class Tab(Connection):
             await self
             item = await self.query_selector(selector)
             if loop.time() - start_time > timeout:
-                raise asyncio.TimeoutError(
-                    "time ran out while waiting for %s" % selector
-                )
+                return items
             await self.sleep(0.5)
         return item
 
@@ -271,9 +268,7 @@ class Tab(Connection):
             await self
             results = await self.find_elements_by_text(text)
             if loop.time() - now > timeout:
-                raise asyncio.TimeoutError(
-                    "time ran out while waiting for text: %s" % text
-                )
+                return items
             await self.sleep(0.5)
         return items
 
@@ -308,9 +303,7 @@ class Tab(Connection):
             await self
             items = await self.query_selector_all(selector)
             if loop.time() - now > timeout:
-                raise asyncio.TimeoutError(
-                    "time ran out while waiting for %s" % selector
-                )
+                return items
             await self.sleep(0.5)
         return items
 
@@ -614,6 +607,7 @@ class Tab(Connection):
                         for text_node in iframe_text_nodes
                     ]
                     items.extend(text_node.parent for text_node in iframe_text_elems)
+
         try:
             if not items:
                 return
@@ -733,107 +727,107 @@ class Tab(Connection):
         """
         js_code_a = (
             """
-                           function ___dump(obj, _d = 0) {
-                               let _typesA = ['object', 'function'];
-                               let _typesB = ['number', 'string', 'boolean'];
-                               if (_d == 2) {
-                                   console.log('maxdepth reached for ', obj);
-                                   return
-                               }
-                               let tmp = {}
-                               for (let k in obj) {
-                                   if (obj[k] == window) continue;
-                                   let v;
-                                   try {
-                                       if (obj[k] === null || obj[k] === undefined || obj[k] === NaN) {
-                                           console.log('obj[k] is null or undefined or Nan', k, '=>', obj[k])
-                                           tmp[k] = obj[k];
+                               function ___dump(obj, _d = 0) {
+                                   let _typesA = ['object', 'function'];
+                                   let _typesB = ['number', 'string', 'boolean'];
+                                   if (_d == 2) {
+                                       console.log('maxdepth reached for ', obj);
+                                       return
+                                   }
+                                   let tmp = {}
+                                   for (let k in obj) {
+                                       if (obj[k] == window) continue;
+                                       let v;
+                                       try {
+                                           if (obj[k] === null || obj[k] === undefined || obj[k] === NaN) {
+                                               console.log('obj[k] is null or undefined or Nan', k, '=>', obj[k])
+                                               tmp[k] = obj[k];
+                                               continue
+                                           }
+                                       } catch (e) {
+                                           tmp[k] = null;
                                            continue
                                        }
-                                   } catch (e) {
-                                       tmp[k] = null;
-                                       continue
-                                   }
-
-
-                                   if (_typesB.includes(typeof obj[k])) {
-                                       tmp[k] = obj[k]
-                                       continue
-                                   }
-
-                                   try {
-                                       if (typeof obj[k] === 'function') {
-                                           tmp[k] = obj[k].toString()
+    
+    
+                                       if (_typesB.includes(typeof obj[k])) {
+                                           tmp[k] = obj[k]
                                            continue
                                        }
-
-
-                                       if (typeof obj[k] === 'object') {
-                                           tmp[k] = ___dump(obj[k], _d + 1);
+    
+                                       try {
+                                           if (typeof obj[k] === 'function') {
+                                               tmp[k] = obj[k].toString()
+                                               continue
+                                           }
+    
+    
+                                           if (typeof obj[k] === 'object') {
+                                               tmp[k] = ___dump(obj[k], _d + 1);
+                                               continue
+                                           }
+    
+    
+                                       } catch (e) {}
+    
+                                       try {
+                                           tmp[k] = JSON.stringify(obj[k])
                                            continue
+                                       } catch (e) {
+    
                                        }
-
-
-                                   } catch (e) {}
-
-                                   try {
-                                       tmp[k] = JSON.stringify(obj[k])
-                                       continue
-                                   } catch (e) {
-
+                                       try {
+                                           tmp[k] = obj[k].toString();
+                                           continue
+                                       } catch (e) {}
                                    }
-                                   try {
-                                       tmp[k] = obj[k].toString();
-                                       continue
-                                   } catch (e) {}
+                                   return tmp
                                }
-                               return tmp
-                           }
-
-                           function ___dumpY(obj) {
-                               var objKeys = (obj) => {
-                                   var [target, result] = [obj, []];
-                                   while (target !== null) {
-                                       result = result.concat(Object.getOwnPropertyNames(target));
-                                       target = Object.getPrototypeOf(target);
+    
+                               function ___dumpY(obj) {
+                                   var objKeys = (obj) => {
+                                       var [target, result] = [obj, []];
+                                       while (target !== null) {
+                                           result = result.concat(Object.getOwnPropertyNames(target));
+                                           target = Object.getPrototypeOf(target);
+                                       }
+                                       return result;
                                    }
-                                   return result;
+                                   return Object.fromEntries(
+                                       objKeys(obj).map(_ => [_, ___dump(obj[_])]))
+    
                                }
-                               return Object.fromEntries(
-                                   objKeys(obj).map(_ => [_, ___dump(obj[_])]))
-
-                           }
-                           ___dumpY( %s )
-                   """
+                               ___dumpY( %s )
+                       """
             % obj_name
         )
         js_code_b = (
             """
-            ((obj, visited = new WeakSet()) => {
-                 if (visited.has(obj)) {
-                     return {}
-                 }
-                 visited.add(obj)
-                 var result = {}, _tmp;
-                 for (var i in obj) {
-                         try {
-                             if (i === 'enabledPlugin' || typeof obj[i] === 'function') {
-                                 continue;
-                             } else if (typeof obj[i] === 'object') {
-                                 _tmp = recurse(obj[i], visited);
-                                 if (Object.keys(_tmp).length) {
-                                     result[i] = _tmp;
-                                 }
-                             } else {
-                                 result[i] = obj[i];
-                             }
-                         } catch (error) {
-                             // console.error('Error:', error);
-                         }
+                ((obj, visited = new WeakSet()) => {
+                     if (visited.has(obj)) {
+                         return {}
                      }
-                return result;
-            })(%s)
-        """
+                     visited.add(obj)
+                     var result = {}, _tmp;
+                     for (var i in obj) {
+                             try {
+                                 if (i === 'enabledPlugin' || typeof obj[i] === 'function') {
+                                     continue;
+                                 } else if (typeof obj[i] === 'object') {
+                                     _tmp = recurse(obj[i], visited);
+                                     if (Object.keys(_tmp).length) {
+                                         result[i] = _tmp;
+                                     }
+                                 } else {
+                                     result[i] = obj[i];
+                                 }
+                             } catch (error) {
+                                 // console.error('Error:', error);
+                             }
+                         }
+                    return result;
+                })(%s)
+            """
             % obj_name
         )
 
@@ -848,7 +842,6 @@ class Tab(Connection):
             )
         )
         if exception_details:
-
             # try second variant
 
             remote_object, exception_details = await self.send(
@@ -1190,8 +1183,8 @@ class Tab(Connection):
         :rtype: str
         """
         # noqa
-        import urllib.parse
         import datetime
+        import urllib.parse
 
         await self.sleep()  # update the target's url
         path = None
@@ -1302,6 +1295,59 @@ class Tab(Connection):
         await checkbox.mouse_move()
         await checkbox.mouse_click()
 
+    async def get_local_storage(self):
+        """
+        get local storage items as dict of strings (careful!, proper deserialization needs to be done if needed)
+
+        :return:
+        :rtype:
+        """
+        if not self.target.url:
+            await self
+
+        # there must be a better way...
+        origin = "/".join(self.url.split("/", 3)[:-1])
+
+        items = await self.send(
+            cdp.dom_storage.get_dom_storage_items(
+                cdp.dom_storage.StorageId(is_local_storage=True, security_origin=origin)
+            )
+        )
+        retval = {}
+        for item in items:
+            retval[item[0]] = item[1]
+        return retval
+
+    async def set_local_storage(self, items: dict):
+        """
+        set local storage.
+        dict items must be strings. simple types will be converted to strings automatically.
+
+        :param items: dict containing {key:str, value:str}
+        :type items: dict[str,str]
+        :return:
+        :rtype:
+        """
+        if not self.target.url:
+            await self
+        # there must be a better way...
+        origin = "/".join(self.url.split("/", 3)[:-1])
+
+        await asyncio.gather(
+            *[
+                self.send(
+                    cdp.dom_storage.set_dom_storage_item(
+                        storage_id=cdp.dom_storage.StorageId(
+                            is_local_storage=True, security_origin=origin
+                        ),
+                        key=str(key),
+                        value=str(val),
+                    )
+                )
+                for key, val in items.items()
+            ]
+        )
+
     def __call__(
         self,
         text: Optional[str] = "",
@@ -1339,3 +1385,48 @@ class Tab(Connection):
             extra = f"[url: {self.target.url}]"
         s = f"<{type(self).__name__} [{self.target_id}] [{self.type_}] {extra}>"
         return s
+
+
+async def get_cf_label(tab: Tab):
+    """
+    ;temp1 = [...document.querySelectorAll('*')].filter( e => e.shadowRoot)?.[0].shadowRoot/.children[0].shadowRoot.children[0].contentDocument.children[0].children[1].shadowRoot.children[1].children[0].querySelector('label').click()
+    ;label = [...document.querySelectorAll('*')].filter( e => e.shadowRoot)?.[0].shadowRoot.children[0].contentDocument.children[0].children[1].shadowRoot.children[1].children[0].querySelector('label')
+    temp1.children[1].children[0].shadowRoot.children[0].contentDocument.children[0].children[1].shadowRoot.children[1].children[0].querySelector('label').click()
+    """
+    # candidates = [
+    #     f for f in
+    #     (await tab.find_all('iframe'))
+    #     if f.src and 'challenges' in f.src]
+    # candidate = candidates.pop()
+    # iframe = element.create(candidate.node, tab, candidate.node.content_document)
+    # shadows = util.filter_recurse_all(iframe.tree, lambda e: e.shadow_roots is not None)
+    # if shadows:
+    #     inner_shadows = [shadow.shadow_roots[0] for shadow in shadows]
+    #     elems = [
+    #         element.create(inner_shadow, tab) for inner_shadow in inner_shadows]
+    #     for elem in elems:
+    #         if elem.children[-1].children[-1].children[0].children[0].children[0].children[0]:
+    #             return elem
+    #     else:
+    #         return elems
+    return await tab.evaluate(
+        """
+        [...document.querySelectorAll('*')].filter( e => e.shadowRoot)?.[0].shadowRoot.children[0].contentDocument.children[0].children[1].shadowRoot.children[1].children[0].querySelector('label')""",
+        return_by_value=False,
+    )
+
+
+async def click_cf_label(tab: Tab):
+    obj, _ = await get_cf_label(tab)
+    if obj and obj.object_id:
+        arguments = [cdp.runtime.CallArgument(object_id=obj.object_id)]
+        return await tab.send(
+            cdp.runtime.call_function_on(
+                "(el) => el.click()",
+                object_id=obj.object_id,
+                arguments=arguments,
+                await_promise=True,
+                user_gesture=True,
+                return_by_value=True,
+            )
+        )

@@ -1,5 +1,7 @@
 # NODRIVER
 
+## for docs click [here](https://ultrafunkamsterdam.github.io/nodriver)
+
 **This package provides next level webscraping and browser automation
 using a relatively simple interface.**
 
@@ -22,7 +24,7 @@ While usability and convenience is important. It’s also easy
 to fully customizable everything using the entire array of
 [CDP](https://chromedevtools.github.io/devtools-protocol/) domains, methods and events available.
 
-## Some features
+### Some features
 
 * A blazing fast undetected chrome (-ish) automation library
 * No chromedriver binary or Selenium dependency
@@ -40,37 +42,48 @@ to fully customizable everything using the entire array of
   to a nodriver.Browser instance and contintue from there
 * packed with helpers and utility methods for most used and important operations
 
-<!-- * ```elem.text```
-* ```elem.text_all```
+### what is new
 
-* ```elem.parent.parent.parent.attrs```
-* ```anchor_elem.href and anchor_elem['href']```
-* ```anchor_elem.href = 'someotherthing'; await anchor_elem.save()```
-* ```elem.children[-1].children[0].children[4].parent.parent```
+**tab.open_external_debugger()**
 
-* ```await html5video_element.record_video()```
-* ```await html5video_element('pause')```
-* ```await html5video_element.apply('''(el) => el.currentTime = 0''')```
-* ```tab = await browser.get(url, new_tab=True)```
-* ```tab_win = await browser.get(url, new_window=True)```
-* ```first = await tab.find('search text')```
-* ```best = await tab.find('search text', best_match=True)```
-* ```all_results = await tab.find_all('search text')```
-* ```first_submit_button = await tab.select(selector='button[type=submit]')```
-* ```inputs_in_form = await tab.select_all('form input')``` -->
+lets you inspect the tab without breaking your connection
+
+**tab.get_local_storage()**
+
+get localstorage content
+
+**tab.set_local_storage(dict)**
+
+set localstorage content
+
+**tab.add_handler(someEvent, callback)**
+
+callback may accept a single argument (event), or 2 arguments (event, tab).
+
+**start(expert=True)**
+
+does some hacking for more experienced users. It disables web security and origin-trials, as well as ensures shadow-roots are always  open.
+
+### Some examples of what the api looks like
+
+> * ``elem.text``
+> * ``elem.text_all``
+> * ``elem.parent.parent.parent.attrs``
+> * ``anchor_elem.href and anchor_elem['href']``
+> * ``anchor_elem.href = 'someotherthing'; await anchor_elem.save()``
+> * ``elem.children[-1].children[0].children[4].parent.parent``
+> * ``await html5video_element.record_video()``
+> * ``await html5video_element('pause')``
+> * ``await html5video_element.apply('''(el) => el.currentTime = 0''')``
+> * ``tab = await browser.get(url, new_tab=True)``
+> * ``tab_win = await browser.get(url, new_window=True)``
+> * ``first = await tab.find('search text')``
+> * ``best = await tab.find('search text', best_match=True)``
+> * ``all_results = await tab.find_all('search text')``
+> * ``first_submit_button = await tab.select(selector='button[type=submit]')``
+> * ``inputs_in_form = await tab.select_all('form input')``
 
 ### Installation
-
-Since it’s a part of undetected-chromedriver, installation goes via
-
-```default
-pip install undetected-chromedriver
-```
-
----
-
-In case you don’t want undetected-chromedriver, this package can be installed
-using
 
 ```default
 pip install nodriver
