@@ -239,7 +239,7 @@ class Tab(Connection):
             await self
             item = await self.query_selector(selector)
             if loop.time() - start_time > timeout:
-                return items
+                return item
             await self.sleep(0.5)
         return item
 
@@ -266,7 +266,7 @@ class Tab(Connection):
 
         while not items:
             await self
-            results = await self.find_elements_by_text(text)
+            items = await self.find_elements_by_text(text)
             if loop.time() - now > timeout:
                 return items
             await self.sleep(0.5)
