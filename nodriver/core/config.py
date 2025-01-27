@@ -80,13 +80,13 @@ class Config:
         if not browser_args:
             browser_args = []
 
-        if not user_data_dir:
+        if not user_data_dir and not (host and port):
             self._user_data_dir = temp_profile_dir()
             self._custom_data_dir = False
         else:
             self.user_data_dir = user_data_dir
 
-        if not browser_executable_path:
+        if not browser_executable_path and not (host and port):
             browser_executable_path = find_chrome_executable()
 
         self._browser_args = browser_args
