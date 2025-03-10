@@ -126,7 +126,7 @@ class Browser:
 
     @property
     def websocket_url(self):
-        return self.info.webSocketDebuggerUrl
+        return self.info.webSocketDebuggerUrl.replace('localhost', self.config.host or 'locahost')
 
     @property
     def main_tab(self) -> tab.Tab:
@@ -434,7 +434,7 @@ class Browser:
                 )
             )
 
-        self.connection = Connection(self.info.webSocketDebuggerUrl, browser=self)
+        self.connection = Connection(self.info.webSocketDebuggerUrl.replace('localhost', self.config.host or 'locahost'), browser=self)
 
         if self.config.autodiscover_targets:
             logger.info("enabling autodiscover targets")
@@ -913,7 +913,7 @@ class HTTPApi:
     async def post(self, endpoint, data):
         return await self._request(endpoint, data)
 
-    async def _request(self, endpoint, method: str = "get", data: dict = None):
+    async def _request(self, endpoint, method: str = "GET", data: dict = None):
         url = urllib.parse.urljoin(
             self.api, f"json/{endpoint}" if endpoint else "/json"
         )
