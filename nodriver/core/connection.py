@@ -116,7 +116,7 @@ class Transaction(asyncio.Future):
             self.__cdp_obj__.send(response["result"])
         except StopIteration as e:
             # exception value holds the parsed response
-            return self.set_result(e.value)
+            pass
         raise ProtocolException("could not parse the cdp response:\n%s" % response)
 
     def __repr__(self):
